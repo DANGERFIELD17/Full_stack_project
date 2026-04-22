@@ -5,7 +5,7 @@ A minimal full-stack web application for reporting local community issues.
 ## Features
 - Submit a new problem report (title, description, location, category)
 - View all submitted reports
-- Track report status (open, in_progress, resolved)
+- Track report status (open, inProgress, resolved)
 
 ## Run locally
 ```bash

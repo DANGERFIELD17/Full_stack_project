@@ -3,12 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 
-const reports = [];
-let nextId = 1;
-
 const publicDir = path.join(__dirname, "public");
 
-const validStatuses = new Set(["open", "in_progress", "resolved"]);
+const validStatuses = new Set(["open", "inProgress", "resolved"]);
 
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
@@ -31,72 +28,6 @@ function getContentType(filePath) {
   if (filePath.endsWith(".js")) return "application/javascript";
   if (filePath.endsWith(".html")) return "text/html";
   return "text/plain";
-}
-
-async function handleApi(req, res, pathname) {
-  if (req.method === "GET" && pathname === "/api/reports") {
-    return sendJson(res, 200, reports);
-  }
-
-  if (req.method === "POST" && pathname === "/api/reports") {
-    const body = await readBody(req);
-    let payload;
-    try {
-      payload = JSON.parse(body || "{}");
-    } catch {
-      return sendJson(res, 400, { error: "Invalid JSON payload" });
-    }
-
-    const title = String(payload.title || "").trim();
-    const description = String(payload.description || "").trim();
-    const location = String(payload.location || "").trim();
-    const category = String(payload.category || "").trim() || "general";
-
-    if (!title || !description || !location) {
-      return sendJson(res, 400, {
-        error: "title, description and location are required"
-      });
-    }
-
-    const report = {
-      id: nextId++,
-      title,
-      description,
-      location,
-      category,
-      status: "open",
-      createdAt: new Date().toISOString()
-    };
-    reports.push(report);
-    return sendJson(res, 201, report);
-  }
-
-  const statusMatch = pathname.match(/^\/api\/reports\/(\d+)\/status$/);
-  if (req.method === "PATCH" && statusMatch) {
-    const reportId = Number(statusMatch[1]);
-    const report = reports.find((item) => item.id === reportId);
-    if (!report) {
-      return sendJson(res, 404, { error: "Report not found" });
-    }
-
-    const body = await readBody(req);
-    let payload;
-    try {
-      payload = JSON.parse(body || "{}");
-    } catch {
-      return sendJson(res, 400, { error: "Invalid JSON payload" });
-    }
-
-    const status = String(payload.status || "").trim();
-    if (!validStatuses.has(status)) {
-      return sendJson(res, 400, { error: "Invalid status" });
-    }
-
-    report.status = status;
-    return sendJson(res, 200, report);
-  }
-
-  return false;
 }
 
 function handleStatic(req, res, pathname) {
@@ -122,6 +53,75 @@ function handleStatic(req, res, pathname) {
 }
 
 function createServer() {
+  const reports = [];
+  let nextId = 1;
+
+  async function handleApi(req, res, pathname) {
+    if (req.method === "GET" && pathname === "/api/reports") {
+      return sendJson(res, 200, reports);
+    }
+
+    if (req.method === "POST" && pathname === "/api/reports") {
+      const body = await readBody(req);
+      let payload;
+      try {
+        payload = JSON.parse(body || "{}");
+      } catch {
+        return sendJson(res, 400, { error: "Invalid JSON payload" });
+      }
+
+      const title = String(payload.title || "").trim();
+      const description = String(payload.description || "").trim();
+      const location = String(payload.location || "").trim();
+      const category = String(payload.category || "").trim() || "general";
+
+      if (!title || !description || !location) {
+        return sendJson(res, 400, {
+          error: "title, description and location are required"
+        });
+      }
+
+      const report = {
+        id: nextId++,
+        title,
+        description,
+        location,
+        category,
+        status: "open",
+        createdAt: new Date().toISOString()
+      };
+      reports.push(report);
+      return sendJson(res, 201, report);
+    }
+
+    const statusMatch = pathname.match(/^\/api\/reports\/(\d+)\/status$/);
+    if (req.method === "PATCH" && statusMatch) {
+      const reportId = Number(statusMatch[1]);
+      const report = reports.find((item) => item.id === reportId);
+      if (!report) {
+        return sendJson(res, 404, { error: "Report not found" });
+      }
+
+      const body = await readBody(req);
+      let payload;
+      try {
+        payload = JSON.parse(body || "{}");
+      } catch {
+        return sendJson(res, 400, { error: "Invalid JSON payload" });
+      }
+
+      const status = String(payload.status || "").trim();
+      if (!validStatuses.has(status)) {
+        return sendJson(res, 400, { error: "Invalid status" });
+      }
+
+      report.status = status;
+      return sendJson(res, 200, report);
+    }
+
+    return false;
+  }
+
   return http.createServer(async (req, res) => {
     const reqUrl = new URL(req.url, "http://localhost");
     const pathname = reqUrl.pathname;
@@ -136,6 +136,7 @@ function createServer() {
       }
       handleStatic(req, res, pathname);
     } catch (err) {
+      console.error("Request error:", err);
       sendJson(res, 500, { error: "Internal Server Error" });
     }
   });

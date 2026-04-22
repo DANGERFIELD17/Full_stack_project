@@ -3,8 +3,18 @@ const messageEl = document.getElementById("message");
 const reportsList = document.getElementById("reports-list");
 
 async function fetchReports() {
-  const response = await fetch("/api/reports");
-  const reports = await response.json();
+  let reports = [];
+  try {
+    const response = await fetch("/api/reports");
+    if (!response.ok) {
+      messageEl.textContent = "Failed to load reports.";
+      return;
+    }
+    reports = await response.json();
+  } catch {
+    messageEl.textContent = "Failed to load reports.";
+    return;
+  }
 
   reportsList.innerHTML = "";
   if (!reports.length) {
@@ -26,7 +36,7 @@ async function fetchReports() {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -46,15 +56,25 @@ form.addEventListener("submit", async (event) => {
     category: formData.get("category")
   };
 
-  const response = await fetch("/api/reports", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  let response;
+  try {
+    response = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    messageEl.textContent = "Failed to submit report.";
+    return;
+  }
 
   if (!response.ok) {
-    const errorBody = await response.json();
-    messageEl.textContent = errorBody.error || "Failed to submit report";
+    let errorMessage = "Failed to submit report.";
+    try {
+      const errorBody = await response.json();
+      errorMessage = errorBody.error || errorMessage;
+    } catch {}
+    messageEl.textContent = errorMessage;
     return;
   }
 
