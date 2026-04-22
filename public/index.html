@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Community Problem Reporting</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Local Community Problem Reporting System</h1>
+      <p>Report issues in your neighborhood so they can be tracked and resolved.</p>
+
+      <section>
+        <h2>Submit a report</h2>
+        <form id="report-form">
+          <label for="title">Title</label>
+          <input id="title" name="title" required />
+
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" required></textarea>
+
+          <label for="location">Location</label>
+          <input id="location" name="location" required />
+
+          <label for="category">Category</label>
+          <select id="category" name="category">
+            <option value="general">General</option>
+            <option value="road">Road</option>
+            <option value="sanitation">Sanitation</option>
+            <option value="lighting">Lighting</option>
+            <option value="safety">Safety</option>
+          </select>
+
+          <button type="submit">Submit Report</button>
+        </form>
+        <p id="message" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <h2>Reported issues</h2>
+        <ul id="reports-list"></ul>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>
