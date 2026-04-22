@@ -7,21 +7,43 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <main>
-      <h1>Local Community Problem Reporting System</h1>
-      <p>Report issues in your neighborhood so they can be tracked and resolved.</p>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Community Operations</p>
+        <h1>Local Community Problem Reporting System</h1>
+        <p>Track neighborhood issues from report to resolution in one shared dashboard.</p>
+      </header>
 
-      <section>
+      <section class="stats" aria-label="Report statistics">
+        <article class="stat-card">
+          <p>Total</p>
+          <strong id="stat-total">0</strong>
+        </article>
+        <article class="stat-card">
+          <p>Open</p>
+          <strong id="stat-open">0</strong>
+        </article>
+        <article class="stat-card">
+          <p>In Progress</p>
+          <strong id="stat-inProgress">0</strong>
+        </article>
+        <article class="stat-card">
+          <p>Resolved</p>
+          <strong id="stat-resolved">0</strong>
+        </article>
+      </section>
+
+      <section class="panel">
         <h2>Submit a report</h2>
         <form id="report-form">
           <label for="title">Title</label>
-          <input id="title" name="title" required />
+          <input id="title" name="title" maxlength="100" required />
 
           <label for="description">Description</label>
-          <textarea id="description" name="description" rows="4" required></textarea>
+          <textarea id="description" name="description" rows="4" maxlength="1000" required></textarea>
 
           <label for="location">Location</label>
-          <input id="location" name="location" required />
+          <input id="location" name="location" maxlength="120" required />
 
           <label for="category">Category</label>
           <select id="category" name="category">
@@ -30,6 +52,9 @@
             <option value="sanitation">Sanitation</option>
             <option value="lighting">Lighting</option>
             <option value="safety">Safety</option>
+            <option value="water">Water</option>
+            <option value="electricity">Electricity</option>
+            <option value="other">Other</option>
           </select>
 
           <button type="submit">Submit Report</button>
@@ -37,9 +62,39 @@
         <p id="message" aria-live="polite"></p>
       </section>
 
-      <section>
-        <h2>Reported issues</h2>
-        <ul id="reports-list"></ul>
+      <section class="panel">
+        <div class="section-head">
+          <h2>Reported issues</h2>
+          <button id="refresh-button" type="button" class="secondary">Refresh</button>
+        </div>
+
+        <form id="filters-form" class="filters" aria-label="Filter reports">
+          <label for="filter-status">Status</label>
+          <select id="filter-status" name="status">
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="inProgress">In Progress</option>
+            <option value="resolved">Resolved</option>
+          </select>
+
+          <label for="filter-category">Category</label>
+          <select id="filter-category" name="category">
+            <option value="">All categories</option>
+            <option value="general">General</option>
+            <option value="road">Road</option>
+            <option value="sanitation">Sanitation</option>
+            <option value="lighting">Lighting</option>
+            <option value="safety">Safety</option>
+            <option value="water">Water</option>
+            <option value="electricity">Electricity</option>
+            <option value="other">Other</option>
+          </select>
+
+          <label for="filter-query">Search</label>
+          <input id="filter-query" name="q" placeholder="title, description, location" />
+        </form>
+
+        <ul id="reports-list" class="reports-list"></ul>
       </section>
     </main>
 
