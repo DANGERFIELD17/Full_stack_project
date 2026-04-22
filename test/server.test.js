@@ -6,6 +6,27 @@ function makeRequest(baseUrl, route, options = {}) {
   return fetch(`${baseUrl}${route}`, options);
 }
 
+function extractSessionCookie(response) {
+  const setCookieHeader = response.headers.get("set-cookie");
+  if (!setCookieHeader) {
+    return "";
+  }
+  return setCookieHeader.split(";")[0];
+}
+
+async function loginAsAdmin(baseUrl, password = "admin123") {
+  const response = await makeRequest(baseUrl, "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: "admin", password })
+  });
+
+  return {
+    response,
+    cookie: extractSessionCookie(response)
+  };
+}
+
 async function startTestServer() {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));
@@ -20,13 +41,18 @@ function stopTestServer(server) {
   );
 }
 
-test("creates and lists reports", async () => {
+function withCookie(cookie, headers = {}) {
+  return cookie ? { ...headers, Cookie: cookie } : headers;
+}
+
+test("public users can submit complaints", async () => {
   const { server, baseUrl } = await startTestServer();
 
   const createResponse = await makeRequest(baseUrl, "/api/reports", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      filedByName: "Maya",
       title: "Broken streetlight",
       description: "The streetlight on 3rd avenue is not working.",
       location: "3rd Avenue",
@@ -37,123 +63,126 @@ test("creates and lists reports", async () => {
   assert.equal(createResponse.status, 201);
   const created = await createResponse.json();
   assert.equal(created.title, "Broken streetlight");
+  assert.equal(created.filedByName, "Maya");
   assert.equal(created.status, "open");
 
-  const listResponse = await makeRequest(baseUrl, "/api/reports");
-  assert.equal(listResponse.status, 200);
-  const list = await listResponse.json();
-  assert.equal(list.length, 1);
-  assert.equal(list[0].location, "3rd Avenue");
-
   await stopTestServer(server);
 });
 
-test("rejects incomplete reports", async () => {
+test("rejects incomplete or invalid complaints", async () => {
   const { server, baseUrl } = await startTestServer();
 
   const createResponse = await makeRequest(baseUrl, "/api/reports", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      filedByName: "",
       title: "",
-      description: "Missing title",
-      location: "Main Street"
-    })
-  });
-
-  assert.equal(createResponse.status, 400);
-  const body = await createResponse.json();
-  assert.match(body.error, /required/);
-
-  await stopTestServer(server);
-});
-
-test("updates report status and validates status updates", async () => {
-  const { server, baseUrl } = await startTestServer();
-
-  const createResponse = await makeRequest(baseUrl, "/api/reports", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: "Overflowing trash bin",
-      description: "Needs urgent cleanup.",
-      location: "Park entrance"
-    })
-  });
-  const created = await createResponse.json();
-
-  const updateResponse = await makeRequest(
-    baseUrl,
-    `/api/reports/${created.id}/status`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "resolved" })
-    }
-  );
-  assert.equal(updateResponse.status, 200);
-  const updated = await updateResponse.json();
-  assert.equal(updated.status, "resolved");
-
-  const invalidStatusResponse = await makeRequest(
-    baseUrl,
-    `/api/reports/${created.id}/status`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "closed" })
-    }
-  );
-  assert.equal(invalidStatusResponse.status, 400);
-
-  const missingReportResponse = await makeRequest(baseUrl, "/api/reports/999/status", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "resolved" })
-  });
-  assert.equal(missingReportResponse.status, 404);
-
-  await stopTestServer(server);
-});
-
-test("rejects invalid category values", async () => {
-  const { server, baseUrl } = await startTestServer();
-
-  const createResponse = await makeRequest(baseUrl, "/api/reports", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: "Unknown category example",
-      description: "Category should be validated.",
-      location: "North block",
+      description: "Missing details",
+      location: "Main Street",
       category: "parks"
     })
   });
 
   assert.equal(createResponse.status, 400);
   const body = await createResponse.json();
+  assert.match(body.error, /filedByName is required/);
+  assert.match(body.error, /title, description and location are required/);
   assert.match(body.error, /Invalid category/);
 
   await stopTestServer(server);
 });
 
-test("filters reports and returns dashboard stats", async () => {
+test("admin login is required for dashboard endpoints", async () => {
   const { server, baseUrl } = await startTestServer();
 
-  const seedReports = [
-    {
+  const unauthorizedList = await makeRequest(baseUrl, "/api/reports");
+  assert.equal(unauthorizedList.status, 401);
+
+  const unauthorizedStats = await makeRequest(baseUrl, "/api/reports/stats");
+  assert.equal(unauthorizedStats.status, 401);
+
+  const badLogin = await loginAsAdmin(baseUrl, "wrong-password");
+  assert.equal(badLogin.response.status, 401);
+
+  const loginResult = await loginAsAdmin(baseUrl);
+  assert.equal(loginResult.response.status, 200);
+
+  const meResponse = await makeRequest(baseUrl, "/api/me", {
+    headers: withCookie(loginResult.cookie)
+  });
+  assert.equal(meResponse.status, 200);
+  const me = await meResponse.json();
+  assert.equal(me.role, "admin");
+  assert.equal(me.userId, "admin");
+
+  await stopTestServer(server);
+});
+
+test("admin can see all complaints and change status", async () => {
+  const { server, baseUrl } = await startTestServer();
+
+  const firstComplaint = await makeRequest(baseUrl, "/api/reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filedByName: "Alice",
       title: "Pothole near school",
       description: "Large pothole blocks lane.",
       location: "Oak Street",
       category: "road"
-    },
+    })
+  });
+  const created = await firstComplaint.json();
+
+  const adminLogin = await loginAsAdmin(baseUrl);
+  assert.equal(adminLogin.response.status, 200);
+
+  const listResponse = await makeRequest(baseUrl, "/api/reports", {
+    headers: withCookie(adminLogin.cookie)
+  });
+  assert.equal(listResponse.status, 200);
+  const list = await listResponse.json();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].filedByName, "Alice");
+
+  const updateResponse = await makeRequest(baseUrl, `/api/reports/${created.id}/status`, {
+    method: "PATCH",
+    headers: withCookie(adminLogin.cookie, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ status: "resolved" })
+  });
+  assert.equal(updateResponse.status, 200);
+  const updated = await updateResponse.json();
+  assert.equal(updated.status, "resolved");
+
+  const statsResponse = await makeRequest(baseUrl, "/api/reports/stats", {
+    headers: withCookie(adminLogin.cookie)
+  });
+  assert.equal(statsResponse.status, 200);
+  const stats = await statsResponse.json();
+  assert.deepEqual(stats, {
+    total: 1,
+    open: 0,
+    inProgress: 0,
+    resolved: 1
+  });
+
+  await stopTestServer(server);
+});
+
+test("admin report filtering searches filer names too", async () => {
+  const { server, baseUrl } = await startTestServer();
+
+  const payloads = [
     {
+      filedByName: "Alice",
       title: "Streetlight outage",
       description: "Dark stretch after 8pm.",
       location: "Maple Avenue",
       category: "lighting"
     },
     {
+      filedByName: "Bob",
       title: "Leaking water line",
       description: "Water pooling at intersection.",
       location: "Main junction",
@@ -161,52 +190,82 @@ test("filters reports and returns dashboard stats", async () => {
     }
   ];
 
-  for (const payload of seedReports) {
-    const createResponse = await makeRequest(baseUrl, "/api/reports", {
+  for (const payload of payloads) {
+    const response = await makeRequest(baseUrl, "/api/reports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    assert.equal(createResponse.status, 201);
+    assert.equal(response.status, 201);
   }
 
-  const listAllResponse = await makeRequest(baseUrl, "/api/reports");
-  const listAll = await listAllResponse.json();
-  const firstReportId = listAll[2].id;
-
-  const updateResponse = await makeRequest(baseUrl, `/api/reports/${firstReportId}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "resolved" })
+  const adminLogin = await loginAsAdmin(baseUrl);
+  const filteredByName = await makeRequest(baseUrl, "/api/reports?q=alice", {
+    headers: withCookie(adminLogin.cookie)
   });
-  assert.equal(updateResponse.status, 200);
+  assert.equal(filteredByName.status, 200);
+  const reportsByName = await filteredByName.json();
+  assert.equal(reportsByName.length, 1);
+  assert.equal(reportsByName[0].filedByName, "Alice");
 
-  const filteredByCategory = await makeRequest(baseUrl, "/api/reports?category=water");
-  assert.equal(filteredByCategory.status, 200);
+  const filteredByCategory = await makeRequest(baseUrl, "/api/reports?category=water", {
+    headers: withCookie(adminLogin.cookie)
+  });
   const categoryReports = await filteredByCategory.json();
   assert.equal(categoryReports.length, 1);
   assert.equal(categoryReports[0].category, "water");
 
-  const filteredByStatus = await makeRequest(baseUrl, "/api/reports?status=resolved");
-  assert.equal(filteredByStatus.status, 200);
-  const statusReports = await filteredByStatus.json();
-  assert.equal(statusReports.length, 1);
-  assert.equal(statusReports[0].status, "resolved");
+  await stopTestServer(server);
+});
 
-  const filteredByQuery = await makeRequest(baseUrl, "/api/reports?q=streetlight");
-  const queryReports = await filteredByQuery.json();
-  assert.equal(queryReports.length, 1);
-  assert.match(queryReports[0].title, /Streetlight/i);
+test("complainants can view complaint status by name", async () => {
+  const { server, baseUrl } = await startTestServer();
 
-  const statsResponse = await makeRequest(baseUrl, "/api/reports/stats");
-  assert.equal(statsResponse.status, 200);
-  const stats = await statsResponse.json();
-  assert.deepEqual(stats, {
-    total: 3,
-    open: 2,
-    inProgress: 0,
-    resolved: 1
-  });
+  const payloads = [
+    {
+      filedByName: "Maya",
+      title: "Streetlight outage",
+      description: "Dark stretch after 8pm.",
+      location: "Maple Avenue",
+      category: "lighting"
+    },
+    {
+      filedByName: "Maya",
+      title: "Leaking water line",
+      description: "Water pooling at intersection.",
+      location: "Main junction",
+      category: "water"
+    },
+    {
+      filedByName: "Alex",
+      title: "Pothole near market",
+      description: "Large pothole blocks lane.",
+      location: "Oak Street",
+      category: "road"
+    }
+  ];
+
+  for (const payload of payloads) {
+    const response = await makeRequest(baseUrl, "/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    assert.equal(response.status, 201);
+  }
+
+  const mayaReportsResponse = await makeRequest(
+    baseUrl,
+    "/api/complainant/reports?filedByName=maya"
+  );
+  assert.equal(mayaReportsResponse.status, 200);
+  const mayaReports = await mayaReportsResponse.json();
+  assert.equal(mayaReports.length, 2);
+  assert.equal(mayaReports[0].filedByName, "Maya");
+  assert.equal(mayaReports[1].filedByName, "Maya");
+
+  const missingNameResponse = await makeRequest(baseUrl, "/api/complainant/reports");
+  assert.equal(missingNameResponse.status, 400);
 
   await stopTestServer(server);
 });

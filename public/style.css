@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
   margin: 0;
@@ -38,6 +42,48 @@ body {
   gap: 1rem;
 }
 
+.login-panel,
+.view-panel,
+.app-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-area {
+  display: grid;
+  gap: 1rem;
+}
+
+.role-panel h2 {
+  margin-top: 0;
+}
+
+.role-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.role-actions .role-choice {
+  min-width: 150px;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.role-actions .role-choice.is-selected {
+  color: #ffffff;
+  background: linear-gradient(120deg, var(--primary-dark), var(--primary));
+  border-color: transparent;
+}
+
+.complaint-form,
+.login-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .hero {
   padding: 1.25rem;
   border-radius: 1rem;
@@ -45,6 +91,10 @@ body {
   color: #f8fafc;
   box-shadow: var(--shadow);
   animation: fade-slide-in 400ms ease-out;
+}
+
+.hero-compact {
+  padding: 1rem;
 }
 
 .hero h1 {
@@ -101,14 +151,37 @@ body {
   gap: 0.75rem;
 }
 
-form {
-  display: grid;
-  gap: 0.65rem;
+.session-actions {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.session-label {
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  color: rgba(248, 250, 252, 0.9);
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.section-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0.5rem 0 0.75rem;
 }
 
 .filters {
   margin-top: 0.5rem;
   margin-bottom: 1rem;
+  display: grid;
+  gap: 0.75rem;
   align-items: end;
 }
 
@@ -158,6 +231,20 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.message {
+  min-height: 1.25rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.message[data-type="error"] {
+  color: var(--danger);
+}
+
+.message[data-type="success"] {
+  color: var(--success);
+}
+
 .reports-list {
   list-style: none;
   margin: 0;
@@ -178,6 +265,13 @@ button:disabled {
   margin: 0;
 }
 
+.report-top-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .report-description {
   margin: 0.5rem 0;
   line-height: 1.4;
@@ -194,6 +288,7 @@ button:disabled {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .status-pill {
@@ -221,20 +316,6 @@ button:disabled {
   color: #166534;
 }
 
-#message {
-  min-height: 1.25rem;
-  margin-top: 0.3rem;
-  font-weight: 600;
-}
-
-#message[data-type="error"] {
-  color: var(--danger);
-}
-
-#message[data-type="success"] {
-  color: var(--success);
-}
-
 @keyframes fade-slide-in {
   from {
     opacity: 0;
@@ -247,8 +328,36 @@ button:disabled {
 }
 
 @media (max-width: 880px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
+  .role-actions {
+    flex-direction: column;
+  }
+
+  .login-form,
   .filters {
     grid-template-columns: 1fr;
+  }
+
+  .role-switch,
+  .session-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-top-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding-inline: 0.75rem;
   }
 }
